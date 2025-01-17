@@ -3,10 +3,11 @@ package kubectl
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"net"
 	"net/http"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/loft-sh/devspace/pkg/devspace/kubectl/portforward"
 	"github.com/loft-sh/devspace/pkg/util/log"
@@ -23,6 +24,7 @@ const (
 	minikubeProvider        = "minikube.sigs.k8s.io"
 	dockerDesktopContext    = "docker-desktop"
 	dockerForDesktopContext = "docker-for-desktop"
+	orbstackContext         = "orbstack"
 )
 
 // WaitStatus are the status to wait
@@ -95,6 +97,8 @@ func GetPodStatus(pod *corev1.Pod) string {
 
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+			continue
+		case container.State.Running != nil && pod.Spec.InitContainers[i].RestartPolicy != nil:
 			continue
 		case container.State.Terminated != nil:
 			// initialization is failed
@@ -216,6 +220,7 @@ func IsLocalKubernetes(kubeClient Client) bool {
 
 	context := kubeClient.CurrentContext()
 	if strings.HasPrefix(context, "kind-") ||
+		context == orbstackContext ||
 		context == dockerDesktopContext ||
 		context == dockerForDesktopContext {
 		return true

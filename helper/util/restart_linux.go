@@ -4,6 +4,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,8 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/loft-sh/devspace/helper/util/stderrlog"
 	"github.com/loft-sh/devspace/pkg/devspace/build/builder/restart"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type containerRestarter struct {
@@ -69,8 +72,23 @@ func (*containerRestarter) RestartContainer() error {
 	}
 
 	// kill the process group
-	_ = syscall.Kill(-pgid, syscall.SIGINT)
-	time.Sleep(2000)
-	_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	procPath := "/proc/" + strconv.Itoa(pgid)
+
+	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL} {
+		stderrlog.Infof("Sending %s signal...", sig.String())
+		err = syscall.Kill(-pgid, sig)
+		if err != nil {
+			return nil
+		}
+		err = wait.PollUntilContextTimeout(context.TODO(), time.Second, 5*time.Second, true, func(_ context.Context) (done bool, err error) {
+			_, err = os.Stat(procPath)
+			return os.IsNotExist(err), nil
+		})
+		if err == nil {
+			return nil
+		}
+	}
+
+	stderrlog.Errorf("Timeout waiting for the process to terminate")
 	return nil
 }

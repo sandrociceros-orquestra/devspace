@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/api/types/image"
+	dockerregistry "github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/api/types/system"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/loft-sh/devspace/pkg/util/fsutil"
 	"gopkg.in/yaml.v3"
@@ -20,8 +22,8 @@ type fakeDockerClient struct {
 	dockerclient.Client
 }
 
-func (f *fakeDockerClient) Info(ctx context.Context) (types.Info, error) {
-	return types.Info{
+func (f *fakeDockerClient) Info(ctx context.Context) (system.Info, error) {
+	return system.Info{
 		IndexServerAddress: "IndexServerAddress",
 	}, nil
 }
@@ -30,26 +32,26 @@ func (f *fakeDockerClient) Ping(ctx context.Context) (types.Ping, error) {
 	return types.Ping{}, nil
 }
 
-func (f *fakeDockerClient) RegistryLogin(ctx context.Context, auth types.AuthConfig) (registry.AuthenticateOKBody, error) {
+func (f *fakeDockerClient) RegistryLogin(ctx context.Context, auth dockerregistry.AuthConfig) (dockerregistry.AuthenticateOKBody, error) {
 	identityToken := ""
 	if auth.Password == "useToken" {
 		identityToken = "someToken"
 	}
-	return registry.AuthenticateOKBody{
+	return dockerregistry.AuthenticateOKBody{
 		IdentityToken: identityToken,
 	}, nil
 }
 
-func (f *fakeDockerClient) ImageList(ctx context.Context, options types.ImageListOptions) ([]types.ImageSummary, error) {
-	return []types.ImageSummary{
+func (f *fakeDockerClient) ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
+	return []image.Summary{
 		{
 			ID: "deleteThis",
 		},
 	}, nil
 }
 
-func (f *fakeDockerClient) ImageRemove(ctx context.Context, image string, options types.ImageRemoveOptions) ([]types.ImageDeleteResponseItem, error) {
-	return []types.ImageDeleteResponseItem{
+func (f *fakeDockerClient) ImageRemove(ctx context.Context, img string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
+	return []image.DeleteResponse{
 		{
 			Deleted:  "deleteThis",
 			Untagged: "deleteThis",
@@ -107,7 +109,7 @@ type getAuthConfigTestCase struct {
 	registryURL           string
 	checkCredentialsStore bool
 
-	expectedAuthConfig *types.AuthConfig
+	expectedAuthConfig *dockerregistry.AuthConfig
 	expectedErr        bool
 }
 
@@ -116,7 +118,7 @@ func TestGetAuthConfig(t *testing.T) {
 		{
 			name:                  "Use default server",
 			checkCredentialsStore: true,
-			expectedAuthConfig: &types.AuthConfig{
+			expectedAuthConfig: &dockerregistry.AuthConfig{
 				ServerAddress: "IndexServerAddress",
 			},
 		},
@@ -124,7 +126,7 @@ func TestGetAuthConfig(t *testing.T) {
 			name:                  "Use custom server",
 			registryURL:           "http://custom",
 			checkCredentialsStore: true,
-			expectedAuthConfig: &types.AuthConfig{
+			expectedAuthConfig: &dockerregistry.AuthConfig{
 				ServerAddress: "custom",
 			},
 		},
@@ -202,7 +204,7 @@ type loginTestCase struct {
 	saveAuthConfig        bool
 	relogin               bool
 
-	expectedAuthConfig *types.AuthConfig
+	expectedAuthConfig *dockerregistry.AuthConfig
 	expectedErr        bool
 }
 
@@ -214,7 +216,7 @@ func TestLogin(t *testing.T) {
 			saveAuthConfig:        true,
 			user:                  "user",
 			password:              "useToken",
-			expectedAuthConfig: &types.AuthConfig{
+			expectedAuthConfig: &dockerregistry.AuthConfig{
 				ServerAddress: "IndexServerAddress",
 				Username:      "user",
 				IdentityToken: "someToken",

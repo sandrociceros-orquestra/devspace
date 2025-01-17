@@ -18,7 +18,7 @@ func (r *LocalRegistry) ensureService(ctx devspacecontext.Context) (*corev1.Serv
 	var existing *corev1.Service
 	desired := r.getService()
 	kubeClient := ctx.KubeClient()
-	err := wait.PollImmediateWithContext(ctx.Context(), time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx.Context(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
 
 		existing, err = kubeClient.KubeClient().CoreV1().Services(r.Namespace).Get(ctx, r.Name, metav1.GetOptions{})
@@ -50,8 +50,7 @@ func (r *LocalRegistry) ensureService(ctx devspacecontext.Context) (*corev1.Serv
 	if err != nil {
 		return nil, err
 	}
-
-	return ctx.KubeClient().KubeClient().CoreV1().Services(r.Namespace).Apply(
+	apply, err := ctx.KubeClient().KubeClient().CoreV1().Services(r.Namespace).Apply(
 		ctx.Context(),
 		applyConfiguration,
 		metav1.ApplyOptions{
@@ -59,6 +58,13 @@ func (r *LocalRegistry) ensureService(ctx devspacecontext.Context) (*corev1.Serv
 			Force:        true,
 		},
 	)
+	if kerrors.IsUnsupportedMediaType(err) {
+		ctx.Log().Debugf("Server-side apply not available on the server for localRegistry service: (%v)", err)
+		// Unsupport server-side apply, we use existing or created service
+		return existing, nil
+	}
+
+	return apply, err
 }
 
 func (r *LocalRegistry) getService() *corev1.Service {

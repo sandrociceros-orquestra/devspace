@@ -3,6 +3,11 @@ package kubectl
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/loft-sh/devspace/pkg/devspace/config/localcache"
 	"github.com/loft-sh/devspace/pkg/devspace/kill"
 	"github.com/loft-sh/devspace/pkg/devspace/kubectl/util"
@@ -12,17 +17,12 @@ import (
 	"github.com/loft-sh/devspace/pkg/util/log"
 	"github.com/loft-sh/devspace/pkg/util/survey"
 	"github.com/loft-sh/devspace/pkg/util/terminal"
-	"io"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"net/http"
-	"os"
-	"time"
-
 	"github.com/mgutz/ansi"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	k8sv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -417,7 +417,7 @@ func wakeUp(ctx context.Context, client Client, log log.Logger) error {
 	log.Infof("DevSpace is waking up the Kubernetes environment, please wait a moment...")
 
 	// wake up the environment
-	waitErr := wait.PollImmediate(time.Second, time.Second*30, func() (done bool, err error) {
+	waitErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Second*30, true, func(_ context.Context) (done bool, err error) {
 		_, err = kubeClient.CoreV1().Pods(client.Namespace()).List(ctx, metav1.ListOptions{LabelSelector: "devspace=wakeup"})
 		if err != nil {
 			return false, nil

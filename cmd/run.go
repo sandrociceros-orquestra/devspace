@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/loft-sh/devspace/pkg/devspace/kubectl"
 	"github.com/loft-sh/devspace/pkg/devspace/pipeline/env"
 	"mvdan.cc/sh/v3/expand"
 
@@ -250,10 +251,14 @@ func (cmd *RunCmd) LoadCommandsConfig(f factory.Factory, configLoader loader.Con
 	}
 
 	// verify client connectivity / authn / authz
-	_, err = client.KubeClient().Discovery().ServerVersion()
-	if err != nil {
-		log.Debugf("Unable to discover server version: %v", err)
-		client = nil
+	if client != nil {
+		// If the current kube context or namespace is different than old,
+		// show warnings and reset kube client if necessary
+		client, err = kubectl.CheckKubeContext(client, localCache, cmd.NoWarn, cmd.SwitchContext, false, log)
+		if err != nil {
+			log.Debugf("Unable to verify kube context %v", err)
+			client = nil
+		}
 	}
 
 	// Parse commands
