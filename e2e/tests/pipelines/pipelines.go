@@ -75,6 +75,8 @@ var _ = DevSpaceDescribe("pipelines", func() {
 		framework.ExpectLocalFileContentsImmediately("other.txt", "test\n")
 		framework.ExpectLocalFileContentsImmediately("other2.txt", "false\n")
 		framework.ExpectLocalFileContentsImmediately("other3.txt", "true\n")
+		framework.ExpectLocalFileContentsImmediately("other4-0.txt", "one\n")
+		framework.ExpectLocalFileContentsImmediately("other4-1.txt", "two\n")
 		framework.ExpectLocalFileContentsImmediately("other-profile.txt", "profile1\n")
 		framework.ExpectLocalFileContentsImmediately("dep1-test.txt", "test\n")
 		framework.ExpectLocalFileContentsImmediately("dep1-test2.txt", "true\n")
@@ -83,6 +85,143 @@ var _ = DevSpaceDescribe("pipelines", func() {
 		framework.ExpectLocalFileContentsImmediately("dep1-other2.txt", "false\n")
 		framework.ExpectLocalFileContentsImmediately("dep1-other3.txt", "false\n")
 		framework.ExpectLocalFileContentsImmediately("dep1-other-profile.txt", "profile1\n")
+	})
+
+	ginkgo.It("should resolve pipeline override array flags", func() {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/flags")
+		framework.ExpectNoError(err)
+		defer framework.CleanupTempDir(initialDir, tempDir)
+
+		ns, err := kubeClient.CreateNamespace("pipelines")
+		framework.ExpectNoError(err)
+		defer framework.ExpectDeleteNamespace(kubeClient, ns)
+
+		rootCmd := cmd.NewRootCmd(f)
+		persistentFlags := rootCmd.PersistentFlags()
+		globalFlags := flags.SetGlobalFlags(persistentFlags)
+		globalFlags.NoWarn = true
+		globalFlags.Namespace = ns
+		globalFlags.Profiles = []string{"profile1"}
+
+		cmdCtx := values.WithCommandFlags(context.Background(), globalFlags.Flags)
+		cmdCtx = values.WithFlagsMap(cmdCtx, map[string]string{
+			"other":  "test",
+			"other2": "false",
+			"other3": "true",
+			"other4": "three four",
+		})
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: globalFlags,
+			Pipeline:    "other",
+			Ctx:         cmdCtx,
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectNoError(err)
+
+		framework.ExpectLocalFileContentsImmediately("other.txt", "test\n")
+		framework.ExpectLocalFileContentsImmediately("other2.txt", "false\n")
+		framework.ExpectLocalFileContentsImmediately("other3.txt", "true\n")
+		framework.ExpectLocalFileContentsImmediately("other-profile.txt", "profile1\n")
+		framework.ExpectLocalFileContentsImmediately("other4-0.txt", "three\n")
+		framework.ExpectLocalFileContentsImmediately("other4-1.txt", "four\n")
+	})
+
+	ginkgo.It("should resolve pipeline override with --set-flags", func() {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/flags")
+		framework.ExpectNoError(err)
+		defer framework.CleanupTempDir(initialDir, tempDir)
+
+		ns, err := kubeClient.CreateNamespace("pipelines")
+		framework.ExpectNoError(err)
+		defer framework.ExpectDeleteNamespace(kubeClient, ns)
+
+		rootCmd := cmd.NewRootCmd(f)
+		persistentFlags := rootCmd.PersistentFlags()
+		globalFlags := flags.SetGlobalFlags(persistentFlags)
+		globalFlags.NoWarn = true
+		globalFlags.Namespace = ns
+		globalFlags.Profiles = []string{"profile1"}
+
+		cmdCtx := values.WithCommandFlags(context.Background(), globalFlags.Flags)
+		cmdCtx = values.WithFlagsMap(cmdCtx, map[string]string{})
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: globalFlags,
+			Pipeline:    "other-override",
+			Ctx:         cmdCtx,
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectNoError(err)
+
+		framework.ExpectLocalFileContentsImmediately("other.txt", "test\n")
+		framework.ExpectLocalFileContentsImmediately("other2.txt", "true\n")
+		framework.ExpectLocalFileContentsImmediately("other3.txt", "true\n")
+		framework.ExpectLocalFileContentsImmediately("other-profile.txt", "profile1\n")
+		framework.ExpectLocalFileContentsImmediately("other4-0.txt", "five\n")
+		framework.ExpectLocalFileContentsImmediately("other4-1.txt", "six\n")
+	})
+
+	ginkgo.It("should resolve dependency pipeline flag defaults", func() {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/flags")
+		framework.ExpectNoError(err)
+		defer framework.CleanupTempDir(initialDir, tempDir)
+
+		ns, err := kubeClient.CreateNamespace("pipelines")
+		framework.ExpectNoError(err)
+		defer framework.ExpectDeleteNamespace(kubeClient, ns)
+
+		rootCmd := cmd.NewRootCmd(f)
+		persistentFlags := rootCmd.PersistentFlags()
+		globalFlags := flags.SetGlobalFlags(persistentFlags)
+		globalFlags.NoWarn = true
+		globalFlags.Namespace = ns
+		globalFlags.Profiles = []string{"profile1"}
+
+		cmdCtx := values.WithCommandFlags(context.Background(), globalFlags.Flags)
+		cmdCtx = values.WithFlagsMap(cmdCtx, map[string]string{})
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: globalFlags,
+			Pipeline:    "arr-dep1",
+			Ctx:         cmdCtx,
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectNoError(err)
+
+		framework.ExpectLocalFileContentsImmediately("arr-0.txt", "one")
+		framework.ExpectLocalFileContentsImmediately("arr-1.txt", "two")
+	})
+
+	ginkgo.It("should resolve dependency pipeline flag defaults", func() {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/flags")
+		framework.ExpectNoError(err)
+		defer framework.CleanupTempDir(initialDir, tempDir)
+
+		ns, err := kubeClient.CreateNamespace("pipelines")
+		framework.ExpectNoError(err)
+		defer framework.ExpectDeleteNamespace(kubeClient, ns)
+
+		rootCmd := cmd.NewRootCmd(f)
+		persistentFlags := rootCmd.PersistentFlags()
+		globalFlags := flags.SetGlobalFlags(persistentFlags)
+		globalFlags.NoWarn = true
+		globalFlags.Namespace = ns
+		globalFlags.Profiles = []string{"profile1"}
+
+		cmdCtx := values.WithCommandFlags(context.Background(), globalFlags.Flags)
+		cmdCtx = values.WithFlagsMap(cmdCtx, map[string]string{})
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: globalFlags,
+			Pipeline:    "arr-dep1-override",
+			Ctx:         cmdCtx,
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectNoError(err)
+
+		framework.ExpectLocalFileContentsImmediately("arr-0.txt", "three")
+		framework.ExpectLocalFileContentsImmediately("arr-1.txt", "")
 	})
 
 	ginkgo.It("should exec container", func() {
@@ -301,6 +440,34 @@ var _ = DevSpaceDescribe("pipelines", func() {
 			framework.ExpectNoError(err)
 		}
 	})
+	ginkgo.It("should fail to watch files with unquoted globbing", func(ctx context.Context) {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/run_watch")
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(framework.CleanupTempDir, initialDir, tempDir)
+
+		ns, err := kubeClient.CreateNamespace("pipelines")
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(framework.ExpectDeleteNamespace, kubeClient, ns)
+
+		cancelCtx, cancel := context.WithCancel(ctx)
+		ginkgo.DeferCleanup(cancel)
+
+		output := &bytes.Buffer{}
+		multiWriter := io.MultiWriter(output, os.Stdout)
+		log := logpkg.NewStreamLogger(multiWriter, multiWriter, logrus.DebugLevel)
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: &flags.GlobalFlags{
+				NoWarn:    true,
+				Namespace: ns,
+			},
+			Pipeline: "unquoted-glob",
+			Ctx:      cancelCtx,
+			Log:      log,
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectError(err)
+	})
 
 	ginkgo.It("should use --set and --set-string values from run_pipelines command", func() {
 		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/run_pipelines")
@@ -385,6 +552,28 @@ var _ = DevSpaceDescribe("pipelines", func() {
 				Namespace: ns,
 			},
 			Pipeline: "dev",
+		}
+		err = devCmd.RunDefault(f)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should not panic on inalid kubeconfig", func() {
+		tempDir, err := framework.CopyToTempDir("tests/pipelines/testdata/invalid_kubeconfig")
+		framework.ExpectNoError(err)
+		defer framework.CleanupTempDir(initialDir, tempDir)
+
+		origEnv := os.Getenv("KUBE_CONFIG")
+		defer os.Setenv("KUBE_CONFIG", origEnv)
+
+		os.Setenv("KUBE_CONFIG", "nonexistent.yaml")
+		newEnv := os.Getenv("KUBE_CONFIG")
+		framework.ExpectEqual(newEnv, "nonexistent.yaml")
+
+		devCmd := &cmd.RunPipelineCmd{
+			GlobalFlags: &flags.GlobalFlags{
+				NoWarn: true,
+			},
+			Pipeline: "deploy",
 		}
 		err = devCmd.RunDefault(f)
 		framework.ExpectNoError(err)

@@ -7,16 +7,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/loft-sh/devspace/pkg/devspace/config/versions/latest"
 	devspacecontext "github.com/loft-sh/devspace/pkg/devspace/context"
 	dependencyutil "github.com/loft-sh/devspace/pkg/devspace/dependency/util"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
-	"github.com/loft-sh/devspace/pkg/devspace/config/versions/latest"
 	"github.com/loft-sh/devspace/pkg/devspace/helm/generic"
 	"github.com/loft-sh/devspace/pkg/devspace/helm/types"
 	"github.com/loft-sh/devspace/pkg/util/log"
 	"github.com/loft-sh/utils/pkg/downloader/commands"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 )
 
@@ -58,6 +57,12 @@ func (c *client) InstallChart(ctx devspacecontext.Context, releaseName string, r
 		valuesFile,
 		"--install",
 	}
+
+	// Add debug flag
+	if ctx.Log().GetLevel() == logrus.DebugLevel {
+		args = append(args, "--debug")
+	}
+
 	if releaseNamespace != "" {
 		args = append(args, "--namespace", releaseNamespace)
 	}
@@ -119,6 +124,7 @@ func (c *client) InstallChart(ctx devspacecontext.Context, releaseName string, r
 			}
 		}
 	}
+
 	// Upgrade options
 	args = append(args, helmConfig.UpgradeArgs...)
 	output, err := c.genericHelm.Exec(ctx, args)
@@ -225,9 +231,11 @@ func (c *client) DeleteRelease(ctx devspacecontext.Context, releaseName string, 
 		"delete",
 		releaseName,
 	}
+
 	if releaseNamespace != "" {
 		args = append(args, "--namespace", releaseNamespace)
 	}
+
 	_, err := c.genericHelm.Exec(ctx, args)
 	if err != nil {
 		return err
